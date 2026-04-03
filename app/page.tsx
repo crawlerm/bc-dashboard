@@ -284,7 +284,7 @@ export default async function Page() {
             <p style={{ margin: '0 0 0.35rem', fontSize: '0.8rem', fontWeight: '600', color: '#555' }}>
               Inshore Forecast — Gibraltar Point to North Foreland (Met Office)
             </p>
-            <p style={{ margin: 0, fontSize: '0.85rem', lineHeight: 1.6, color: '#333' }}>
+            <p style={{ margin: 0, fontSize: '0.85rem', lineHeight: 1.6, color: '#333', whiteSpace: 'pre-line' }}>
               {latestForecast}
             </p>
           </div>

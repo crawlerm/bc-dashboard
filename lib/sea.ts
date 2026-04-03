@@ -121,6 +121,13 @@ export async function fetchCefas(): Promise<CefasData> {
 }
 
 // ── Met Office inshore forecast — Gibraltar Point to North Foreland ────────
+// Structure: <h2>Gibraltar Point to North Foreland (5)</h2>
+//   <h3>24 hour forecast:</h3>
+//   <p><strong>Wind</strong></p><p>...</p>
+//   <p><strong>Sea state</strong></p><p>...</p>
+//   <p><strong>Weather</strong></p><p>...</p>
+//   <p><strong>Visibility</strong></p><p>...</p>
+//   <h3>Outlook for the following 24 hours:</h3> ...
 export async function fetchMetOfficeForecast(): Promise<string | null> {
   try {
     const res = await fetch(
@@ -129,21 +136,38 @@ export async function fetchMetOfficeForecast(): Promise<string | null> {
     )
     if (!res.ok) return null
     const html = await res.text()
+
+    // Find the <h2> that contains "Gibraltar Point"
     const idx = html.indexOf('Gibraltar Point')
     if (idx === -1) return null
-    // Extract ~1500 chars from the section heading
-    const chunk = html.slice(idx, idx + 1500)
-    // Strip HTML tags, decode common entities, collapse whitespace
+    const sectionStart = html.lastIndexOf('<h2', idx)
+    if (sectionStart === -1) return null
+
+    // Slice to the next <h2> (the following region) to bound our section
+    const nextH2 = html.indexOf('<h2', sectionStart + 10)
+    const sectionEnd = nextH2 !== -1 ? nextH2 : sectionStart + 3000
+    const chunk = html.slice(sectionStart, sectionEnd)
+
+    // Convert structural tags to readable separators before stripping
     const text = chunk
-      .replace(/<\/?[^>]+>/g, ' ')
+      .replace(/<h2[^>]*>/gi, '')
+      .replace(/<\/h2>/gi, '\n')
+      .replace(/<h3[^>]*>/gi, '\n')
+      .replace(/<\/h3>/gi, '\n')
+      .replace(/<\/p>/gi, ' ')
+      .replace(/<strong>/gi, '')
+      .replace(/<\/strong>/gi, ': ')
+      .replace(/<[^>]+>/g, '')           // strip remaining tags
       .replace(/&amp;/g, '&')
       .replace(/&lt;/g, '<')
       .replace(/&gt;/g, '>')
       .replace(/&nbsp;/g, ' ')
-      .replace(/&#\d+;/g, ' ')
-      .replace(/\s{2,}/g, ' ')
+      .replace(/&#\d+;/g, '')
+      .replace(/[ \t]{2,}/g, ' ')        // collapse horizontal whitespace
+      .replace(/\n{3,}/g, '\n\n')        // max 2 consecutive newlines
       .trim()
-    return text.slice(0, 700)
+
+    return text
   } catch {
     return null
   }
