@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase'
+import type { MetOfficeForecastData } from '@/lib/sea'
 
 export const revalidate = 0  // Always fetch fresh — data changes 3x/day
 
@@ -41,6 +42,21 @@ function Arrow({ curr, prev }: { curr: number | null; prev: number | null }) {
   if (pct >  0.0001) return <span style={{ color: '#1a7f37', fontWeight: 'bold' }}>↑</span>
   if (pct < -0.0001) return <span style={{ color: '#cf222e', fontWeight: 'bold' }}>↓</span>
   return <span style={{ color: '#888' }}>→</span>
+}
+
+// ── Met Office forecast field renderer ───────────────────────────────────
+type ForecastPeriod = { wind: string | null; sea_state: string | null; weather: string | null; visibility: string | null }
+const LABEL: React.CSSProperties = { fontSize: '0.7rem', fontWeight: '600', color: '#888', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.1rem' }
+const VALUE: React.CSSProperties = { margin: '0 0 0.5rem', color: '#222' }
+function ForecastFields({ data }: { data: ForecastPeriod }) {
+  return (
+    <>
+      {data.wind       && <><div style={LABEL}>Wind</div>       <p style={VALUE}>{data.wind}</p></>}
+      {data.sea_state  && <><div style={LABEL}>Sea State</div>  <p style={VALUE}>{data.sea_state}</p></>}
+      {data.weather    && <><div style={LABEL}>Weather</div>    <p style={VALUE}>{data.weather}</p></>}
+      {data.visibility && <><div style={LABEL}>Visibility</div> <p style={VALUE}>{data.visibility}</p></>}
+    </>
+  )
 }
 
 // ── Formatters ────────────────────────────────────────────────────────────
@@ -99,7 +115,9 @@ export default async function Page() {
       }) + ' UTC'
     : null
 
-  const latestForecast = seaSnaps.find(s => s.metoffice_forecast)?.metoffice_forecast ?? null
+  const latestForecastRaw = seaSnaps.find(s => s.metoffice_forecast)?.metoffice_forecast ?? null
+  let latestForecast: MetOfficeForecastData | null = null
+  try { if (latestForecastRaw) latestForecast = JSON.parse(latestForecastRaw) } catch { /* old plain-text row */ }
 
   // ── Shared styles ─────────────────────────────────────────────────────
   const TH: React.CSSProperties = {
@@ -280,13 +298,24 @@ export default async function Page() {
 
         {/* Met Office forecast */}
         {latestForecast && (
-          <div style={{ marginTop: '1rem', padding: '0.75rem', background: '#f6f8fa', borderRadius: '6px', border: '1px solid #d0d7de' }}>
-            <p style={{ margin: '0 0 0.35rem', fontSize: '0.8rem', fontWeight: '600', color: '#555' }}>
-              Inshore Forecast — Gibraltar Point to North Foreland (Met Office)
-            </p>
-            <p style={{ margin: 0, fontSize: '0.85rem', lineHeight: 1.6, color: '#333', whiteSpace: 'pre-line' }}>
-              {latestForecast}
-            </p>
+          <div style={{ marginTop: '1rem', border: '1px solid #d0d7de', borderRadius: '6px', overflow: 'hidden', fontSize: '0.875rem' }}>
+            {/* Red header */}
+            <div style={{ background: '#b91c1c', color: '#fff', padding: '0.6rem 0.85rem', fontWeight: '700' }}>
+              {latestForecast.title}
+            </div>
+            <div style={{ padding: '0.75rem 0.85rem' }}>
+              {latestForecast.warning && (
+                <p style={{ margin: '0 0 0.75rem', fontStyle: 'italic', color: '#555' }}>
+                  {latestForecast.warning}
+                </p>
+              )}
+              {/* 24hr */}
+              <p style={{ margin: '0 0 0.5rem', fontWeight: '700', fontSize: '1rem' }}>24 hour forecast:</p>
+              <ForecastFields data={latestForecast.forecast} />
+              {/* Outlook */}
+              <p style={{ margin: '0.75rem 0 0.5rem', fontWeight: '700', fontSize: '1rem' }}>Outlook for the following 24 hours:</p>
+              <ForecastFields data={latestForecast.outlook} />
+            </div>
           </div>
         )}
 

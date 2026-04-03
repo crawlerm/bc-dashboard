@@ -121,13 +121,50 @@ export async function fetchCefas(): Promise<CefasData> {
 }
 
 // ── Met Office inshore forecast — Gibraltar Point to North Foreland ────────
-// Structure: <h2>Gibraltar Point to North Foreland (5)</h2>
+// HTML structure:
+//   <h2>Gibraltar Point to North Foreland (5)</h2>
+//   <p>Strong winds are forecast</p>  ← optional warning
 //   <h3>24 hour forecast:</h3>
-//   <p><strong>Wind</strong></p><p>...</p>
-//   <p><strong>Sea state</strong></p><p>...</p>
-//   <p><strong>Weather</strong></p><p>...</p>
-//   <p><strong>Visibility</strong></p><p>...</p>
-//   <h3>Outlook for the following 24 hours:</h3> ...
+//   <p><strong>Wind</strong></p><p>TEXT</p>
+//   <p><strong>Sea state</strong></p><p>TEXT</p>
+//   <p><strong>Weather</strong></p><p>TEXT</p>
+//   <p><strong>Visibility</strong></p><p>TEXT</p>
+//   <h3>Outlook for the following 24 hours:</h3>  ← same structure
+//
+// Returns a JSON string (MetOfficeForecastData) stored in sea_snapshots.metoffice_forecast
+
+export type MetOfficeForecastData = {
+  title:   string
+  warning: string | null
+  forecast: ForecastPeriod
+  outlook:  ForecastPeriod
+}
+
+type ForecastPeriod = {
+  wind:       string | null
+  sea_state:  string | null
+  weather:    string | null
+  visibility: string | null
+}
+
+function extractField(html: string, label: string): string | null {
+  // Matches: <strong>Wind</strong></p> <p>VALUE</p>
+  const re = new RegExp(
+    `<strong>\\s*${label}\\s*<\\/strong>\\s*<\\/p>\\s*<p>([^<]+)`, 'i'
+  )
+  const m = html.match(re)
+  return m ? m[1].trim() : null
+}
+
+function parsePeriod(html: string): ForecastPeriod {
+  return {
+    wind:       extractField(html, 'Wind'),
+    sea_state:  extractField(html, 'Sea state'),
+    weather:    extractField(html, 'Weather'),
+    visibility: extractField(html, 'Visibility'),
+  }
+}
+
 export async function fetchMetOfficeForecast(): Promise<string | null> {
   try {
     const res = await fetch(
@@ -137,37 +174,32 @@ export async function fetchMetOfficeForecast(): Promise<string | null> {
     if (!res.ok) return null
     const html = await res.text()
 
-    // Find the <h2> that contains "Gibraltar Point"
+    // Locate the Gibraltar Point <h2> and bound to the next <h2>
     const idx = html.indexOf('Gibraltar Point')
     if (idx === -1) return null
     const sectionStart = html.lastIndexOf('<h2', idx)
     if (sectionStart === -1) return null
-
-    // Slice to the next <h2> (the following region) to bound our section
     const nextH2 = html.indexOf('<h2', sectionStart + 10)
-    const sectionEnd = nextH2 !== -1 ? nextH2 : sectionStart + 3000
-    const chunk = html.slice(sectionStart, sectionEnd)
+    const section = html.slice(sectionStart, nextH2 !== -1 ? nextH2 : sectionStart + 4000)
 
-    // Convert structural tags to readable separators before stripping
-    const text = chunk
-      .replace(/<h2[^>]*>/gi, '')
-      .replace(/<\/h2>/gi, '\n')
-      .replace(/<h3[^>]*>/gi, '\n')
-      .replace(/<\/h3>/gi, '\n')
-      .replace(/<\/p>/gi, ' ')
-      .replace(/<strong>/gi, '')
-      .replace(/<\/strong>/gi, ': ')
-      .replace(/<[^>]+>/g, '')           // strip remaining tags
-      .replace(/&amp;/g, '&')
-      .replace(/&lt;/g, '<')
-      .replace(/&gt;/g, '>')
-      .replace(/&nbsp;/g, ' ')
-      .replace(/&#\d+;/g, '')
-      .replace(/[ \t]{2,}/g, ' ')        // collapse horizontal whitespace
-      .replace(/\n{3,}/g, '\n\n')        // max 2 consecutive newlines
-      .trim()
+    // Optional warning line between </h2> and first <h3>
+    const warningMatch = section.match(/<\/h2>\s*<p>([^<]+)<\/p>\s*<h3/i)
+    const warning = warningMatch ? warningMatch[1].trim() : null
 
-    return text
+    // Split into 24hr and outlook parts at the second <h3>
+    const h3s = [...section.matchAll(/<h3/gi)]
+    const outlookStart = h3s[1] ? h3s[1].index! : section.length
+    const forecastHtml = section.slice(0, outlookStart)
+    const outlookHtml  = section.slice(outlookStart)
+
+    const data: MetOfficeForecastData = {
+      title:    'Gibraltar Point to North Foreland (5)',
+      warning,
+      forecast: parsePeriod(forecastHtml),
+      outlook:  parsePeriod(outlookHtml),
+    }
+
+    return JSON.stringify(data)
   } catch {
     return null
   }
