@@ -29,6 +29,12 @@ const f4 = (n: number | null) =>
 const f0 = (n: number | null) =>
   n != null ? n.toLocaleString('en-GB', { maximumFractionDigits: 0 }) : '—'
 
+// Gold in GBP = Gold USD / GBP-USD rate
+const goldGbp = (s: Snap) =>
+  s.gold_usd != null && s.gbp_usd != null && s.gbp_usd > 0
+    ? s.gold_usd / s.gbp_usd
+    : null
+
 export default async function Page() {
   // Fetch last 9 rows — enough for today's 3 + yesterday's 3 for comparison
   const { data, error } = await supabase
@@ -81,7 +87,7 @@ export default async function Page() {
           <thead>
             <tr style={{ background: '#f6f8fa', borderBottom: '2px solid #d0d7de' }}>
               <th style={{ ...TH, textAlign: 'left' }}>UTC</th>
-              <th style={TH}>Gold $/oz</th>
+              <th style={TH}>Gold £/oz</th>
               <th style={TH}>WTI $/bbl</th>
               <th style={TH}>£/$</th>
               <th style={TH}>Base rate</th>
@@ -101,7 +107,7 @@ export default async function Page() {
                 return (
                   <tr key={s.id} style={{ borderBottom: '1px solid #eaecef' }}>
                     <td style={TDL}>{s.label}</td>
-                    <td style={TD}>{f2(s.gold_usd)}&nbsp;<Arrow curr={s.gold_usd} prev={prev?.gold_usd ?? null} /></td>
+                    <td style={TD}>{f2(goldGbp(s))}&nbsp;<Arrow curr={goldGbp(s)} prev={prev ? goldGbp(prev) : null} /></td>
                     <td style={TD}>{f2(s.oil_usd)}&nbsp;<Arrow curr={s.oil_usd} prev={prev?.oil_usd ?? null} /></td>
                     <td style={TD}>{f4(s.gbp_usd)}&nbsp;<Arrow curr={s.gbp_usd} prev={prev?.gbp_usd ?? null} /></td>
                     <td style={TD}>{s.bank_rate != null ? `${s.bank_rate.toFixed(2)}%` : '—'}</td>
