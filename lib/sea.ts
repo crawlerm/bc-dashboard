@@ -1,5 +1,12 @@
 // Sea conditions data fetchers
 
+// Browser-like headers — prevents bot-blocking on Met Office and WSC pages
+const BROWSER_HEADERS = {
+  'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+  'Accept-Language': 'en-GB,en;q=0.9',
+}
+
 // ── Wbtide Supabase (Fort Massac met data, public read) ──────────────────
 const WBTIDE_URL = 'https://otxwipspvafbgbemfbqy.supabase.co'
 const WBTIDE_KEY = 'sb_publishable_QzT5boJEpvDRntDKCiPojQ_oE7eG53B'
@@ -73,7 +80,7 @@ export async function fetchWaldringfield(): Promise<WscData> {
   try {
     const res = await fetch(
       'https://waldringfieldsc.com/weather/Current_Vantage_ProNew2.htm',
-      { cache: 'no-store' }
+      { cache: 'no-store', headers: BROWSER_HEADERS }
     )
     if (!res.ok) return { wind_speed: null, wind_dir: null }
     const html = await res.text()
@@ -175,7 +182,7 @@ export async function fetchMetOfficeForecast(): Promise<string | null> {
   try {
     const res = await fetch(
       'https://weather.metoffice.gov.uk/specialist-forecasts/coast-and-sea/inshore-waters-forecast',
-      { cache: 'no-store' }
+      { cache: 'no-store', headers: BROWSER_HEADERS }
     )
     if (!res.ok) return null
     const html = await res.text()
