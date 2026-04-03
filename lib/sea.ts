@@ -77,10 +77,16 @@ export async function fetchWaldringfield(): Promise<WscData> {
     )
     if (!res.ok) return { wind_speed: null, wind_dir: null }
     const html = await res.text()
-    // Row contains e.g. "WNW at 18.0 mph" inside a <font> tag
+
+    // Normal: "WNW at 18.0 mph"
     const m = html.match(/Wind<\/td>\s*<td[^>]*>(?:<[^>]+>)*([A-Z]{1,3})\s+at\s+([\d.]+)\s+mph/)
-    if (!m) return { wind_speed: null, wind_dir: null }
-    return { wind_dir: m[1], wind_speed: parseFloat(m[2]) }
+    if (m) return { wind_dir: m[1], wind_speed: parseFloat(m[2]) }
+
+    // Calm: Davis stations report "Calm" when wind speed is 0
+    const calm = html.match(/Wind<\/td>\s*<td[^>]*>(?:<[^>]+>)*Calm/)
+    if (calm) return { wind_dir: 'Calm', wind_speed: 0 }
+
+    return { wind_speed: null, wind_dir: null }
   } catch {
     return { wind_speed: null, wind_dir: null }
   }
