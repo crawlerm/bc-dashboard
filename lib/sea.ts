@@ -85,13 +85,13 @@ export async function fetchWaldringfield(): Promise<WscData> {
     if (!res.ok) return { wind_speed: null, wind_dir: null }
     const html = await res.text()
 
-    // Normal: "WNW at 18.0 mph"
-    const m = html.match(/Wind<\/td>\s*<td[^>]*>(?:<[^>]+>)*([A-Z]{1,3})\s+at\s+([\d.]+)\s+mph/)
+    // Old Davis station page — direction+speed appear as plain text "WNW at 18.0 mph"
+    // anywhere in the page regardless of surrounding tag structure
+    const m = html.match(/\b(N|NNE|NE|ENE|E|ESE|SE|SSE|S|SSW|SW|WSW|W|WNW|NW|NNW)\s+at\s+([\d.]+)\s+mph\b/)
     if (m) return { wind_dir: m[1], wind_speed: parseFloat(m[2]) }
 
-    // Calm: Davis stations report "Calm" when wind speed is 0
-    const calm = html.match(/Wind<\/td>\s*<td[^>]*>(?:<[^>]+>)*Calm/)
-    if (calm) return { wind_dir: 'Calm', wind_speed: 0 }
+    // Calm: Davis stations show "Calm" when there is no wind
+    if (/\bCalm\b/.test(html)) return { wind_dir: 'Calm', wind_speed: 0 }
 
     return { wind_speed: null, wind_dir: null }
   } catch {
@@ -187,11 +187,11 @@ export async function fetchMetOfficeForecast(): Promise<string | null> {
     if (!res.ok) return null
     const html = await res.text()
 
-    // Locate the Gibraltar Point <h2> and bound to the next <h2>
-    const idx = html.indexOf('Gibraltar Point')
-    if (idx === -1) return null
-    const sectionStart = html.lastIndexOf('<h2', idx)
-    if (sectionStart === -1) return null
+    // Find the <h2> tag that directly contains "Gibraltar Point"
+    // (can't use indexOf+lastIndexOf — "Gibraltar Point" appears earlier in nav lists)
+    const h2Match = /<h2[^>]*>[^<]*Gibraltar Point/i.exec(html)
+    if (!h2Match) return null
+    const sectionStart = h2Match.index
     const nextH2 = html.indexOf('<h2', sectionStart + 10)
     const section = html.slice(sectionStart, nextH2 !== -1 ? nextH2 : sectionStart + 4000)
 
